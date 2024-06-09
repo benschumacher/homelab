@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e -u -o pipefail
+
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/local/libexec
+
+SVCDIR=$(pwd)
+WORKDIR=/home/staff/ben/src/repos/amridm2mqtt
+
+sleep 1
+cd "${WORKDIR}"
+. "${WORKDIR}/env/bin/activate"
+
+exec 2>&1
+exec envdir "${SVCDIR}/env" setuidgid ben python3 amridm2mqtt
+
