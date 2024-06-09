@@ -1,0 +1,10 @@
+#!/bin/sh
+PATH=/bin:/usr/bin:/usr/local/bin
+
+set -x
+exec 2>&1
+exec envdir env /bin/sh -c '\
+  setuidgid nobody mosquitto_sub -v             \
+    -h "$MQTT_HOST" -p "${MQTT_PORT:-1883}"     \
+    -u "$MQTT_USERNAME" -P "$MQTT_PASSWORD" -v  \
+    -t "shellies/#" -t "shelly/#"'

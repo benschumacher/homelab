@@ -1,0 +1,8 @@
+#!/bin/sh
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/local/libexec
+
+sleep 1
+
+exec 2>&1
+exec envdir env setuidgid ben rtl_433 -F log
+

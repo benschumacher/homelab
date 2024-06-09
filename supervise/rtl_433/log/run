@@ -1,0 +1,6 @@
+#!/bin/sh
+PATH=/bin:/usr/bin:/usr/local/bin
+
+exec 2>&1
+exec setuidgid nobody multilog t s10485760 ./main
+
