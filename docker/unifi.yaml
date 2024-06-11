@@ -5,8 +5,8 @@ services:
     image: docker.io/mongo:4.4
     container_name: unifi-db
     volumes:
-      - /data/docker/unifi-mongodb:/data/db
-      - /data/docker/unifi-iniit-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - /data/docker/unifi-db:/data/db
+      - /data/docker/unifi-init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     restart: unless-stopped
   unifi-network-application:
     depends_on:
@@ -18,7 +18,7 @@ services:
       - PGID=1000
       - TZ=America/Denver
       - MONGO_USER=unifi
-      - MONGO_PASS=
+      - MONGO_PASS=z53S1J45b0eucTk1
       - MONGO_HOST=unifi-db
       - MONGO_PORT=27017
       - MONGO_DBNAME=unifi
@@ -27,7 +27,7 @@ services:
       - MONGO_TLS= #optional
       - MONGO_AUTHSOURCE= #optional
     volumes:
-      - /path/to/data:/config
+      - /data/docker/unifi-network-application:/config
     ports:
       - 8443:8443
       - 3478:3478/udp
