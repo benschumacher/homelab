@@ -1,0 +1,77 @@
+#!/bin/sh
+set -e -u -o pipefail
+
+export RESTIC_REPOSITORY RESTIC_PASSWORD_FILE B2_ACCOUNT_ID B2_ACCOUNT_KEY
+. $HOME/.restic-env
+
+# DRY_RUN environment variable controls whether this is a simulation
+# Set DRY_RUN=1 to enable dry run mode, or leave unset for normal operation
+DRY_RUN=${DRY_RUN:-0}
+# VERBOSE envirnment variables controls whether to display verbose output
+# Set VERBOSE=1 to enable verbose output, or leave unset for normal operation
+VERBOSE=${VERBOSE:-0}
+
+HOST=$(hostname -s)
+LOG_PREFIX="restic-maintenance"
+[ "$DRY_RUN" = "1" ] && LOG_PREFIX="restic-maintenance-dryrun"
+LOG_FILE="$HOME/logs/${LOG_PREFIX}-$(date +%Y%m%d).log"
+
+# Create logs directory if it doesn't exist
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Redirect all output to the log file
+exec > "$LOG_FILE" 2>&1
+
+if [ "$DRY_RUN" = "1" ]; then
+    echo "=== Restic Maintenance DRY RUN started at $(date) ==="
+    echo "NOTE: This is a simulation. No snapshots will be removed."
+else
+    echo "=== Restic Maintenance started at $(date) ==="
+fi
+
+# List snapshots before maintenance
+echo "Current snapshots:"
+restic snapshots
+
+# Build the base forget command with prune included
+FORGET_CMD="restic forget -o b2.connections=8"
+[ "$DRY_RUN" = "1" ] && FORGET_CMD="$FORGET_CMD --dry-run"
+[ "$DRY_RUN" != "1" ] && FORGET_CMD="$FORGET_CMD --prune"
+[ "$VERBOSE" = "1" ] && FORGET_CMD="$FORGET_CMD --verbose"
+
+# Clean up media backups
+echo "Processing media backups..."
+$FORGET_CMD \
+    --tag media \
+    --keep-hourly 0 \
+    --keep-daily 7 \
+    --keep-weekly 4 \
+    --keep-monthly 12 \
+    --keep-yearly 5
+
+# Clean up time-machine backups
+echo "Processing time-machine backups..."
+$FORGET_CMD \
+    --tag "time-machine" \
+    --keep-hourly 0 \
+    --keep-daily 7 \
+    --keep-weekly 4 \
+    --keep-monthly 6 \
+    --keep-yearly 2
+
+# Only run these steps in actual maintenance mode (not dry run)
+if [ "$DRY_RUN" != "1" ]; then
+    # List snapshots after maintenance
+    echo "Remaining snapshots after maintenance:"
+    restic snapshots
+    
+    # Check repository integrity (recommended after pruning)
+    echo "Checking repository integrity..."
+    restic check -o b2.connections=8
+fi
+
+if [ "$DRY_RUN" = "1" ]; then
+    echo "=== Restic Maintenance DRY RUN completed at $(date) ==="
+else
+    echo "=== Restic Maintenance completed at $(date) ==="
+fi
