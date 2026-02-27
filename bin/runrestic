@@ -1,0 +1,60 @@
+#!/bin/sh
+set -e -u -o pipefail
+
+export RESTIC_REPOSITORY RESTIC_PASSWORD_FILE B2_ACCOUNT_ID B2_ACCOUNT_KEY
+. $HOME/.restic-env
+
+# DRY_RUN environment variable controls whether this is a simulation
+# Set DRY_RUN=1 to enable dry run mode, or leave unset for normal operation
+DRY_RUN=${DRY_RUN:-0}
+# VERBOSE envirnment variables controls whether to display verbose output
+# Set VERBOSE=1 to enable verbose output, or leave unset for normal operation
+VERBOSE=${VERBOSE:-0}
+
+LOG_PREFIX="runrestic"
+HOST=$(hostname -s)
+NOW=$(date +'%Y%m%dT%H%M')
+
+LOG_FILE="$HOME/logs/${LOG_PREFIX}-$(date +%Y%m%d).log"
+[ "$DRY_RUN" = "1" ] && LOG_FILE="${LOG_FILE%-*.log}-dryrun-$(date +%Y%m%d).log"
+
+# Create logs directory if it doesn't exist
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Build the base forget command with prune included
+BACKUP_CMD="restic backup -o b2.connections=8"
+[ "$DRY_RUN" = "1" ] && BACKUP_CMD="$BACKUP_CMD --dry-run"
+[ "$VERBOSE" = "1" ] && BACKUP_CMD="$BACKUP_CMD --verbose"
+
+perform_backup() {
+    if [ "$DRY_RUN" = "1" ]; then
+        echo "=== Restic Backup DRY RUN started at $(date) ==="
+        echo "NOTE: This is a simulation. No data will be stored."
+    else
+        echo "=== Restic Backup started at $(date) ==="
+    fi
+
+    $BACKUP_CMD \
+        --exclude-caches \
+        --tag ${HOST} \
+        --tag ${NOW} \
+        --tag media \
+        /media
+
+    $BACKUP_CMD \
+        --exclude-caches \
+        --tag ${HOST} \
+        --tag ${NOW} \
+        --tag time-machine \
+        /var/virt/iocage/jails/samba.vnet/root/media/capsule
+
+    if [ "$DRY_RUN" = "1" ]; then
+        echo "=== Restic Backup DRY RUN completed at $(date) ==="
+    else
+        echo "=== Restic Backup completed at $(date) ==="
+    fi
+}
+
+# Redirect all output to the log file
+perform_backup 2>&1 | tee "${LOG_FILE}"
+

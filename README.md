@@ -40,6 +40,38 @@ Set `MINUTE=0` to bypass the modulo check:
 MINUTE=0 ~/bin/toggle-rtl.sh
 ```
 
+## runrestic (`bin/runrestic`)
+
+Backs up `/media` and the samba jail path
+(`/var/virt/iocage/jails/samba.vnet/root/media/capsule`) to Backblaze B2 via
+restic. Credentials are read from `~/.restic-env`.
+
+Runs are tagged with hostname, timestamp, and dataset (`media` or
+`time-machine`). Output is tee'd to `~/logs/runrestic-YYYYMMDD.log`.
+
+| Env var | Default | Effect |
+|---------|---------|--------|
+| `DRY_RUN` | `0` | Set to `1` to pass `--dry-run` to restic; log file gets `-dryrun-` suffix |
+| `VERBOSE` | `0` | Set to `1` to pass `--verbose` to restic |
+
+## restic-maintenance (`bin/restic-maintenance`)
+
+Enforces retention policy and prunes old snapshots from B2. Runs `restic
+forget` with `--prune` (skipped in dry-run), then `restic check` to verify
+repository integrity. Output goes to `~/logs/restic-maintenance-YYYYMMDD.log`.
+
+Retention policy:
+
+| Dataset | Daily | Weekly | Monthly | Yearly |
+|---------|-------|--------|---------|--------|
+| `media` | 7 | 4 | 12 | 5 |
+| `time-machine` | 7 | 4 | 6 | 2 |
+
+| Env var | Default | Effect |
+|---------|---------|--------|
+| `DRY_RUN` | `0` | Set to `1` to pass `--dry-run` to restic; skips prune and post-maintenance snapshot list |
+| `VERBOSE` | `0` | Set to `1` to pass `--verbose` to restic |
+
 ## TODOs
 
 - Move MQTT credentials out of `rtl_433.conf` — requires bash shebang in `run`
