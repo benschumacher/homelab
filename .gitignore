@@ -1,2 +1,4 @@
 **/*_PASSWORD
+docker/.env
+docker/init-mongo.js
 

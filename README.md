@@ -72,9 +72,21 @@ Retention policy:
 | `DRY_RUN` | `0` | Set to `1` to pass `--dry-run` to restic; skips prune and post-maintenance snapshot list |
 | `VERBOSE` | `0` | Set to `1` to pass `--verbose` to restic |
 
-## TODOs
+## UniFi setup
 
-- Move MQTT credentials out of `rtl_433.conf` — requires bash shebang in `run`
-  for process substitution (`/bin/sh` on FreeBSD is ash-based)
-- Move MongoDB credentials out of `docker/unifi.yaml` and `docker/init-mongo.js`
-  into a gitignored `.env` file
+Credentials are not committed. Before the first `docker compose up`:
+
+1. Create `docker/.env` with `MONGO_PASS=<password>`
+2. Generate `docker/init-mongo.js` from the template:
+   ```sh
+   cd docker && envsubst < init-mongo.js.template > init-mongo.js
+   ```
+
+## rtl_433 setup
+
+MQTT credentials live in `supervise/rtl_433/env/` (gitignored via `**/*_PASSWORD`):
+
+```sh
+echo amridm > supervise/rtl_433/env/MQTT_USERNAME
+echo <password> > supervise/rtl_433/env/MQTT_PASSWORD
+```

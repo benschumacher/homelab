@@ -4,5 +4,7 @@ PATH=/home/staff/ben/src/repos/rtl_433/build/src:/bin:/usr/bin:/usr/local/bin:/u
 sleep 1
 
 exec 2>&1
-exec envdir env setuidgid ben rtl_433 -vv -F log
+exec envdir env /bin/sh -c '\
+  exec setuidgid ben rtl_433 -vv -F log \
+    -F "mqtt://192.168.11.13:1883,user=${MQTT_USERNAME},pass=${MQTT_PASSWORD},retain=0,qos=1,events=rtl_433[/type][/model][/id]"'
 
