@@ -1,0 +1,10 @@
+#cloud-config
+hostname: printserver
+ssh_pwauth: false
+users:
+- name: pi
+  groups: sudo
+  shell: /bin/bash
+  ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPFA8UE55DYfHFIuOLCB4RGq5pj7Gz1DV2mYe8RihaBt ben@homelab
+  sudo: ALL=(ALL) NOPASSWD:ALL

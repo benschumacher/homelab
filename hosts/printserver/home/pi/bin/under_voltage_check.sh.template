@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+SCRIPT=$(basename "$0")
+BROKER="home.assistant.lan"
+TOPIC="/raspberrypi/status"
+
+# fetch status
+STATUS=$(vcgencmd get_throttled | cut -d "=" -f 2)
+
+# redirect output to a log file
+LOGS="$HOME/Logs"
+LOGFILE="$LOGS/$SCRIPT.log"
+mkdir -p "$LOGS"
+touch "$LOGFILE"
+exec >> "$LOGFILE"
+exec 2>> "$LOGFILE"
+
+# has the undervoltage condition occurred since last reboot?
+if [ $(($STATUS & 1 << 16)) -ne 0 ] ; then
+   mosquitto_pub -h "$BROKER" -t "$TOPIC" -u "${MQTT_USER}" -P "${MQTT_PASSWORD}" -m "{\"host\": \"$HOSTNAME\", \"underVoltage\": \"historical\"}"
+fi
+

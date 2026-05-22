@@ -1,0 +1,20 @@
+[Unit]
+Description=Software Defined Radio TCP Server
+After=network-online.target
+After=dhcpcd.service
+Wants=network-online.target
+StartLimitIntervalSec=30
+StartLimitBurst=2
+
+[Service]
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/src/repos/rtl-sdr
+#ExecStartPre=/bin/bash -c "/bin/systemctl set-environment ip=$(ip -o -4 addr list wlan0 | awk '{print $4}' | cut -d/ -f1)"
+ExecStartPre=/bin/bash -c "[[ $(ip -o -4 addr list wlan0 | awk '{print $4}' | cut -d / -f1) == '192.168.11.196' ]] || /bin/sleep 30"
+ExecStart=/home/pi/src/repos/rtl-sdr/build/src/rtl_tcp -a 192.168.11.196
+Restart=always
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
