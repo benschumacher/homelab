@@ -1,0 +1,82 @@
+services:
+  s3ql-media-unsonic:
+    image: benschumacher/s3ql:latest
+    build:
+      context: s3ql-docker
+      dockerfile: Dockerfile
+      args:
+        S3QL_UID: 1000
+        S3QL_GID: 1000
+#      dockerfile_inline: |
+#        FROM benschumacher/s3ql:latest
+#        USER root
+#        RUN    set -x \
+#            && apk add -U --no-cache shadow \
+#            && groupmod -g 1000 s3ql \
+#            && usermod -u 1000 -g s3ql s3ql \
+#            && mkdir -p /mnt/media/unsonic \
+#            && chown s3ql:s3ql /mnt/media/unsonic /var/mountpoint \
+#            && apk del --no-cache shadow \
+#            && apk clean cache \
+#            && true
+#        USER s3ql
+#    user: 1000:1000
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    devices:
+      - /dev/fuse
+    volumes:
+      - /home/debian/.s3ql/authinfo2:/etc/s3ql.authinfo2:ro
+      - /etc/fuse.conf:/etc/fuse.conf:ro
+      - /data/docker/s3ql:/.s3ql
+      - type: bind
+        source: /mnt/s3ql/husband-farmers-01/media
+        target: /mnt/media
+        bind:
+          propagation: shared
+    command: 
+      - gs://husband-farmers-01/unsonic
+      - /mnt/media
+    environment:
+      - S3QL_OPTS=--allow-other
+    restart: unless-stopped
+
+#  cloudflared:
+#    # docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token eyJhIjoiZmI3OThkZjExZTIzNWNkNzg2OGU5MWJjOWQ0ODc4NGUiLCJ0IjoiMmYyMzA4MzMtMDhjOS00MGU3LWJkNDgtODMwMDQxNjZmODI5IiwicyI6Ik4yVm1ZamxrWkRNdE5qRTRNQzAwTjJZM0xUa3lObUl0TmpObU56a3lORFkyTTJVMyJ9
+#    image: cloudflare/cloudflared
+#    user: 1000:1000
+#    restart: unless-stopped
+#    command: tunnel --no-autoupdate run --token eyJhIjoiZmI3OThkZjExZTIzNWNkNzg2OGU5MWJjOWQ0ODc4NGUiLCJ0IjoiMmYyMzA4MzMtMDhjOS00MGU3LWJkNDgtODMwMDQxNjZmODI5IiwicyI6Ik4yVm1ZamxrWkRNdE5qRTRNQzAwTjJZM0xUa3lObUl0TmpObU56a3lORFkyTTJVMyJ9
+#    networks:
+#      - navidrome
+#    dns:
+#      - 192.168.11.1
+#      - 1.1.1.1
+
+  navidrome:
+    image: deluan/navidrome:latest
+    user: 1000:1000
+    ports:
+      - "4533:4533/tcp"
+    environment:
+      - ND_LASTFM_APIKEY=e054bd62a6733f98d6efa5041f7f6426
+      - ND_LASTFM_SECRET=b5530990d2a78af1b4a9247000949976
+    depends_on:
+      - s3ql-media-unsonic
+    volumes:
+      - "/data/docker/navidrome:/data"
+      - "/mnt/nfs/lagos/media/Music:/music:ro"
+#      - "/media:/music:ro"
+    networks:
+      - navidrome
+    dns:
+      - 192.168.11.12
+      - 1.1.1.1
+
+networks:
+  navidrome:
+    name: navidrome
+
+

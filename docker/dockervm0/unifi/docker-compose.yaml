@@ -1,5 +1,4 @@
 ---
-version: "2.1"
 services:
   unifi-db:
     image: docker.io/mongo:4.4
@@ -13,6 +12,8 @@ services:
       - unifi-db
     image: lscr.io/linuxserver/unifi-network-application:latest
     container_name: unifi-network-application
+    labels:
+      - com.centurylinklabs.watchtower.depends-on=unifi-db
     environment:
       - PUID=1000
       - PGID=1000
