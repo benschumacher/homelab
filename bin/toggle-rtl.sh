@@ -11,14 +11,15 @@
 #    current minute divided by 5, and if the value is not 0 (meaning it
 #    is not evenly divisible by 5), stop running
 # 4. else toggle running service:
+#    * deactivate (first, to avoid contention):
+#      - create a `down` file in the supervisor directory
+#      - terminate and set the service to `down`
+#      - poll until supervise confirms the process is gone (up to 10s)
+#      - rewrite the `inactive` symlink in the STATE_DIR
 #    * activate:
 #      - remove the `down` file from supervisor directory
 #      - set the service to `up`
 #      - rewrite the `active` symlink in the STATE_DIR
-#    * deactivate:
-#      - create a `down` file in the supervisor directory
-#      - terminate and set the service to `down`
-#      - rewrite the `inactive` symlink in the STATE_DIR
 #
 
 STATE_DIR="$HOME/.config/toggle-rtl"
@@ -41,12 +42,25 @@ activate() {
 }
 
 deactivate() {
-    echo DEACTIVATING: $ACTIVE
+    echo "DEACTIVATING: $ACTIVE"
     touch "$ACTIVE/down"
     svc -td "$ACTIVE"
+
+    local tries=0
+    while svstat "$ACTIVE" | grep -q ': up'; do
+        sleep 0.5
+        tries=$((tries + 1))
+        if [ "$tries" -ge 20 ]; then
+            echo "WARNING: $ACTIVE didn't go down in time, forcing kill" >&2
+            svc -k "$ACTIVE"
+            sleep 0.5
+            break
+        fi
+    done
+
     ln -nsf "$ACTIVE" "$STATE_DIR/inactive"
 }
 
-activate
 deactivate
+activate
 
