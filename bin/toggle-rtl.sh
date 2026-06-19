@@ -1,32 +1,62 @@
 #!/usr/local/bin/bash
 
 #
-# currently this script runs every 3 minutes, but the behavior for toggling
-# works thusly:
+# toggles between two rtl_tcp client services that can't run concurrently
+# (amridm2mqtt and rtl_433) since they'd contend for the same SDR dongle.
+# runs every 3 minutes via cron; behavior:
 #
 # 1. get the current minute of this execution (0 3 6 9 12 ... etc.)
-# 2. get the current ACTIVE and INACTIVE service (these are managed by
-#    symlinks to their supervisor directories in $HOME/.config/toggle-rtl)
-# 3. if the ACTIVE service is `amridm2mqtt` then, if the modulo of the
-#    current minute divided by 5, and if the value is not 0 (meaning it
-#    is not evenly divisible by 5), stop running
-# 4. else toggle running service:
-#    * deactivate (first, to avoid contention):
-#      - create a `down` file in the supervisor directory
-#      - terminate and set the service to `down`
-#      - poll until supervise confirms the process is gone (up to 10s)
-#      - rewrite the `inactive` symlink in the STATE_DIR
+# 2. determine ACTIVE_NAME from the symlink $HOME/.config/toggle-rtl/active,
+#    which points at /service/<name>. INACTIVE_NAME is derived as "the other
+#    entry" in the SERVICES=(amridm2mqtt rtl_433) array -- NOTE: this script
+#    only supports exactly 2 services; other_of() assumes a pair.
+#    if the symlink is missing/invalid, self-heal by checking svstat
+#    directly. if neither service is up, exit 1 rather than guess.
+# 3. if ACTIVE_NAME is `amridm2mqtt`, only proceed on minutes evenly
+#    divisible by 5 (skip otherwise) -- this gives rtl_433 a 3-minute
+#    window once every 15 minutes. since rtl_433's hop_interval (90s)
+#    restarts fresh each activation, that 3-minute window only ever
+#    covers the first two entries in its frequency list: ~90s on
+#    433.92M (WH2 weather station) then ~90s on 912.6M (ERT meters).
+# 4. else toggle, deactivate-then-activate (in that order, deliberately,
+#    to avoid the dongle-contention overlap bug prior to <8fb280bf1>):
+#    * deactivate:
+#      - touch `down` in the supervisor dir, svc -td, poll svstat for
+#        confirmed-down (up to 10s, falls back to svc -k on timeout)
 #    * activate:
-#      - remove the `down` file from supervisor directory
-#      - set the service to `up`
-#      - rewrite the `active` symlink in the STATE_DIR
+#      - rm `down`, svc -u, rewrite the `active` symlink to point at the
+#        newly-activated service (the only state write in the script)
 #
 
+SERVICES=(amridm2mqtt rtl_433)
 STATE_DIR="$HOME/.config/toggle-rtl"
+STATE_LINK="$STATE_DIR/active"   # single symlink -> /service/<name>
 
 MINUTE=${MINUTE:-$(date +'%M' | sed -e 's/^0//')}
-ACTIVE=$(readlink -f "$STATE_DIR/active")
-INACTIVE=$(readlink -f "$STATE_DIR/inactive")
+
+other_of() {
+    local current="$1"
+    for s in "${SERVICES[@]}"; do
+        [[ "$s" != "$current" ]] && echo "$s" && return
+    done
+}
+
+ACTIVE_NAME=$(basename "$(readlink -f "$STATE_LINK" 2>/dev/null)")
+
+if [[ -z "$ACTIVE_NAME" ]] || [[ ! " ${SERVICES[*]} " =~ " ${ACTIVE_NAME} " ]]; then
+    echo "WARNING: invalid/missing state link, resolving from svstat" >&2
+    for s in "${SERVICES[@]}"; do
+        if svstat "/service/$s" | grep -q ': up'; then
+            ACTIVE_NAME="$s"
+            break
+        fi
+    done
+    [[ -z "$ACTIVE_NAME" ]] && { echo "ERROR: neither service is up, refusing to guess" >&2; exit 1; }
+fi
+
+INACTIVE_NAME=$(other_of "$ACTIVE_NAME")
+ACTIVE="/service/$ACTIVE_NAME"
+INACTIVE="/service/$INACTIVE_NAME"
 
 if [[ $(basename "${ACTIVE}") == 'amridm2mqtt' ]]; then
     if [[ $((MINUTE % 5)) != 0 ]]; then
@@ -57,8 +87,6 @@ deactivate() {
             break
         fi
     done
-
-    ln -nsf "$ACTIVE" "$STATE_DIR/inactive"
 }
 
 deactivate
